@@ -29,9 +29,11 @@ class Codemaps :
 
         self.maxlen = maxlen
         self.suflen = suflen
+        self.preflen = suflen
         words = set([])
         lc_words = set([])
         sufs = set([])
+        prefs = set([])
         labels = set([])
         
         for s in data.sentences() :
@@ -39,6 +41,7 @@ class Codemaps :
                 words.add(t['form'])
                 lc_words.add(t['lc_form'])
                 sufs.add(t['lc_form'][-self.suflen:])
+                prefs.add(t['lc_form'][:self.preflen])
                 labels.add(t['tag'])
 
         self.word_index = {w: i+2 for i,w in enumerate(list(words))}
@@ -53,6 +56,10 @@ class Codemaps :
         self.suf_index['PAD'] = 0  # Padding
         self.suf_index['UNK'] = 1  # Unknown suffixes
 
+        self.pref_index = {p: i+2 for i,p in enumerate(list(prefs))}
+        self.pref_index['PAD'] = 0
+        self.pref_index['UNK'] = 1
+
         self.label_index = {t: i+1 for i,t in enumerate(list(labels))}
         self.label_index['PAD'] = 0 # Padding
         
@@ -60,19 +67,23 @@ class Codemaps :
     def __load(self, name) : 
         self.maxlen = 0
         self.suflen = 0
+        self.preflen = 0
         self.word_index = {}
         self.lc_word_index = {}
         self.suf_index = {}
+        self.pref_index = {}
         self.label_index = {}
 
         with open(name+".idx") as f :
             for line in f.readlines(): 
                 (t,k,i) = line.split()
                 if t == 'MAXLEN' : self.maxlen = int(k)
-                elif t == 'SUFLEN' : self.suflen = int(k)                
+                elif t == 'SUFLEN' : self.suflen = int(k)
+                elif t == 'PREFLEN' : self.preflen = int(k)
                 elif t == 'WORD': self.word_index[k] = int(i)
                 elif t == 'LCWORD': self.lc_word_index[k] = int(i)
                 elif t == 'SUF': self.suf_index[k] = int(i)
+                elif t == 'PREF': self.pref_index[k] = int(i)
                 elif t == 'LABEL': self.label_index[k] = int(i)
                             
     
@@ -82,6 +93,7 @@ class Codemaps :
         with open(name+".idx","w") as f :
             print('MAXLEN', self.maxlen, "-", file=f)
             print('SUFLEN', self.suflen, "-", file=f)
+            print('PREFLEN', self.preflen, "-", file=f)
             for key in self.label_index :
                 print('LABEL', key, self.label_index[key], file=f)
             for key in self.word_index :
@@ -90,6 +102,8 @@ class Codemaps :
                 print('LCWORD', key, self.lc_word_index[key], file=f)
             for key in self.suf_index :
                 print('SUF', key, self.suf_index[key], file=f)
+            for key in self.pref_index :
+                print('PREF', key, self.pref_index[key], file=f)
 
 
     ## --------- encode X from given data ----------- 
@@ -106,8 +120,53 @@ class Codemaps :
         Xs = [[self.suf_index[w['lc_form'][-self.suflen:]] if w['lc_form'][-self.suflen:] in self.suf_index else self.suf_index['UNK'] for w in s] for s in data.sentences()]
         Xs = pad_sequences(maxlen=self.maxlen, sequences=Xs, padding="post", value=self.suf_index['PAD'])
 
-        # return encoded sequences
-        return [Xw, Xs, Xlw]
+        # encode and pad prefixes
+        Xp = [[self.pref_index[w['lc_form'][:self.preflen]] if w['lc_form'][:self.preflen] in self.pref_index else self.pref_index['UNK'] for w in s] for s in data.sentences()]
+        Xp = pad_sequences(maxlen=self.maxlen, sequences=Xp, padding="post", value=self.pref_index['PAD'])
+
+        # orthographic features:
+        # [is_capitalized, is_all_caps, is_all_lower, has_digit,
+        #  has_hyphen, has_slash, has_dot, is_alnum_mixed]
+        Xf = []
+        for s in data.sentences():
+            sent_feats = []
+            for w in s:
+                form = w['form']
+
+                is_capitalized = 1 if len(form) > 0 and form[0].isupper() else 0
+                is_all_caps = 1 if len(form) > 0 and form.isupper() else 0
+                is_all_lower = 1 if len(form) > 0 and form.islower() else 0
+                has_digit = 1 if any(ch.isdigit() for ch in form) else 0
+                has_hyphen = 1 if '-' in form else 0
+                has_slash = 1 if '/' in form else 0
+                has_dot = 1 if '.' in form else 0
+                has_alpha = any(ch.isalpha() for ch in form)
+                is_alnum_mixed = 1 if has_alpha and has_digit else 0
+
+                sent_feats.append([
+                    is_capitalized,
+                    is_all_caps,
+                    is_all_lower,
+                    has_digit,
+                    has_hyphen,
+                    has_slash,
+                    has_dot,
+                    is_alnum_mixed
+                ])
+            Xf.append(sent_feats)
+
+        # pad feature sequences manually
+        padded_Xf = []
+        for sent_feats in Xf:
+            if len(sent_feats) < self.maxlen:
+                sent_feats = sent_feats + [[0, 0, 0, 0, 0, 0, 0, 0]] * (self.maxlen - len(sent_feats))
+            else:
+                sent_feats = sent_feats[:self.maxlen]
+            padded_Xf.append(sent_feats)
+
+        Xf = np.array(padded_Xf, dtype=np.float32)
+
+        return [Xw, Xs, Xlw, Xp, Xf]
 
     
     ## --------- encode Y from given data ----------- 
@@ -128,6 +187,10 @@ class Codemaps :
     ## -------- get suf index size ---------
     def get_n_sufs(self) :
         return len(self.suf_index)
+    
+    ## -------- get pref index size ---------
+    def get_n_prefs(self) :
+        return len(self.pref_index)
 
     ## -------- get label index size ---------
     def get_n_labels(self) :
