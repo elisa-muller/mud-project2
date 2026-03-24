@@ -126,7 +126,8 @@ class Codemaps :
 
         # orthographic features:
         # [is_capitalized, is_all_caps, is_all_lower, has_digit,
-        #  has_hyphen, has_slash, has_dot, is_alnum_mixed]
+        #  has_hyphen, has_slash, has_dot, is_alnum_mixed,
+        #  token_length_norm, starts_with_digit, ends_with_digit, has_parenthesis]
         Xf = []
         for s in data.sentences():
             sent_feats = []
@@ -143,6 +144,11 @@ class Codemaps :
                 has_alpha = any(ch.isalpha() for ch in form)
                 is_alnum_mixed = 1 if has_alpha and has_digit else 0
 
+                token_length_norm = min(len(form), 20) / 20.0
+                starts_with_digit = 1 if len(form) > 0 and form[0].isdigit() else 0
+                ends_with_digit = 1 if len(form) > 0 and form[-1].isdigit() else 0
+                has_parenthesis = 1 if '(' in form or ')' in form else 0
+
                 sent_feats.append([
                     is_capitalized,
                     is_all_caps,
@@ -151,7 +157,11 @@ class Codemaps :
                     has_hyphen,
                     has_slash,
                     has_dot,
-                    is_alnum_mixed
+                    is_alnum_mixed,
+                    token_length_norm,
+                    starts_with_digit,
+                    ends_with_digit,
+                    has_parenthesis
                 ])
             Xf.append(sent_feats)
 
@@ -159,7 +169,7 @@ class Codemaps :
         padded_Xf = []
         for sent_feats in Xf:
             if len(sent_feats) < self.maxlen:
-                sent_feats = sent_feats + [[0, 0, 0, 0, 0, 0, 0, 0]] * (self.maxlen - len(sent_feats))
+                sent_feats = sent_feats + [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] * (self.maxlen - len(sent_feats))
             else:
                 sent_feats = sent_feats[:self.maxlen]
             padded_Xf.append(sent_feats)
