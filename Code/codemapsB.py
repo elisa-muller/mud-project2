@@ -194,7 +194,7 @@ class Codemaps :
 
                 # new features DrugBank
                 token_in_drugbank_vocab = 1 if lc_form in self.drugbank_token_set else 0
-                token_in_drugbank_match = drugbank_match_mask[idx]
+                #token_in_drugbank_match = drugbank_match_mask[idx]
 
                 sent_feats.append([
                     is_capitalized,
@@ -205,8 +205,8 @@ class Codemaps :
                     has_slash,
                     has_dot,
                     is_alnum_mixed,
-                    token_in_drugbank_vocab,
-                    token_in_drugbank_match
+                    token_in_drugbank_vocab
+                    #token_in_drugbank_match
                 ])
             Xf.append(sent_feats)
 
@@ -214,7 +214,7 @@ class Codemaps :
         padded_Xf = []
         for sent_feats in Xf:
             if len(sent_feats) < self.maxlen:
-                sent_feats = sent_feats + [[0]*10] * (self.maxlen - len(sent_feats))
+                sent_feats = sent_feats + [[0]*9] * (self.maxlen - len(sent_feats))
             else:
                 sent_feats = sent_feats[:self.maxlen]
             padded_Xf.append(sent_feats)
