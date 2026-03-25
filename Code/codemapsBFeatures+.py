@@ -9,15 +9,9 @@ from dataset import *
 class Codemaps :
     # --- constructor, create mapper either from training data, or
     # --- loading codemaps from given file
-    def __init__(self, data, maxlen=None, suflen=None, drugbank_file=None):
+    def __init__(self, data, maxlen=None, suflen=None) :
 
-        self.drugbank_token_set = set()
-        self.drugbank_entries = []
-        
-        if drugbank_file is not None:
-            self.__load_drugbank(drugbank_file)
-
-        if isinstance(data, Dataset) and maxlen is not None and suflen is not None:
+        if isinstance(data,Dataset) and maxlen is not None and suflen is not None:
             self.__create_indexs(data, maxlen, suflen)
 
         elif type(data) == str and maxlen is None and suflen is None:
@@ -27,35 +21,7 @@ class Codemaps :
             print('codemaps: Invalid or missing parameters in constructor')
             exit()
 
-
-    def __load_drugbank(self, drugbank_file):
-        with open(drugbank_file, "r", encoding="utf-8", errors="ignore") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-
-                # Format esperat: name|type
-                if "|" in line:
-                    entry = line.split("|")[0].strip().lower()
-                else:
-                    entry = line.lower()
-
-                if entry == "":
-                    continue
-
-                tokens = entry.split()
-                if len(tokens) == 0:
-                    continue
-
-                self.drugbank_entries.append(tokens)
-
-                for tok in tokens:
-                    self.drugbank_token_set.add(tok)
-
-        print("Loaded DrugBank entries:", len(self.drugbank_entries))
-        print("Loaded DrugBank unique tokens:", len(self.drugbank_token_set))
-
+            
     # --------- Create indexs from training data
     # Extract all words and labels in given sentences and 
     # create indexes to encode them as numbers when needed
@@ -160,27 +126,13 @@ class Codemaps :
 
         # orthographic features:
         # [is_capitalized, is_all_caps, is_all_lower, has_digit,
-        #  has_hyphen, has_slash, has_dot, is_alnum_mixed]
+        #  has_hyphen, has_slash, has_dot, is_alnum_mixed,
+        #  token_length_norm, starts_with_digit, ends_with_digit, has_parenthesis]
         Xf = []
         for s in data.sentences():
             sent_feats = []
-            sent_lc_tokens = [w['lc_form'] for w in s]
-
-            # marca tokens que formen part d'un match multiword exacte amb DrugBank
-            drugbank_match_mask = [0] * len(sent_lc_tokens)
-            if len(self.drugbank_entries) > 0:
-                for entry_tokens in self.drugbank_entries:
-                    n = len(entry_tokens)
-                    if n == 0 or n > len(sent_lc_tokens):
-                        continue
-                    for i in range(len(sent_lc_tokens) - n + 1):
-                        if sent_lc_tokens[i:i+n] == entry_tokens:
-                            for j in range(i, i+n):
-                                drugbank_match_mask[j] = 1
-
-            for idx, w in enumerate(s):
+            for w in s:
                 form = w['form']
-                lc_form = w['lc_form']
 
                 is_capitalized = 1 if len(form) > 0 and form[0].isupper() else 0
                 is_all_caps = 1 if len(form) > 0 and form.isupper() else 0
@@ -192,9 +144,10 @@ class Codemaps :
                 has_alpha = any(ch.isalpha() for ch in form)
                 is_alnum_mixed = 1 if has_alpha and has_digit else 0
 
-                # new features DrugBank
-                token_in_drugbank_vocab = 1 if lc_form in self.drugbank_token_set else 0
-                token_in_drugbank_match = drugbank_match_mask[idx]
+                token_length_norm = min(len(form), 20) / 20.0
+                starts_with_digit = 1 if len(form) > 0 and form[0].isdigit() else 0
+                ends_with_digit = 1 if len(form) > 0 and form[-1].isdigit() else 0
+                has_parenthesis = 1 if '(' in form or ')' in form else 0
 
                 sent_feats.append([
                     is_capitalized,
@@ -205,16 +158,18 @@ class Codemaps :
                     has_slash,
                     has_dot,
                     is_alnum_mixed,
-                    token_in_drugbank_vocab,
-                    token_in_drugbank_match
+                    token_length_norm,
+                    starts_with_digit,
+                    ends_with_digit,
+                    has_parenthesis
                 ])
             Xf.append(sent_feats)
 
-        # pad features manually
+        # pad feature sequences manually
         padded_Xf = []
         for sent_feats in Xf:
             if len(sent_feats) < self.maxlen:
-                sent_feats = sent_feats + [[0]*10] * (self.maxlen - len(sent_feats))
+                sent_feats = sent_feats + [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] * (self.maxlen - len(sent_feats))
             else:
                 sent_feats = sent_feats[:self.maxlen]
             padded_Xf.append(sent_feats)
