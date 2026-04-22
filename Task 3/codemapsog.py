@@ -105,25 +105,20 @@ class Codemaps :
         return X
     
     ## --------- encode X from given data ----------- 
-   
-    
-    def encode_words(self, data, features=("word",)):
-        feature_map = {
-            # encode and pad sentence words
-            "word": self.__encode_and_pad(data, self.word_index, 'form'),
+    def encode_words(self, data) :        
 
-            # encode and pad sentence lc_words
-            "lc": self.__encode_and_pad(data, self.lc_word_index, 'lc_form'),
+        # encode and pad sentence words
+        Xw = self.__encode_and_pad(data, self.word_index, 'form')
+        # encode and pad sentence lc_words
+        Xlw = self.__encode_and_pad(data, self.lc_word_index, 'lc_form')        
+        # encode and pad lemmas
+        Xl = self.__encode_and_pad(data, self.lemma_index, 'lemma')        
+        # encode and pad PoS
+        Xp = self.__encode_and_pad(data, self.pos_index, 'pos')        
 
-            # encode and pad lemmas
-            "lemma": self.__encode_and_pad(data, self.lemma_index, 'lemma'),
-
-            # encode and pad PoS
-            "pos": self.__encode_and_pad(data, self.pos_index, 'pos'),
-        }
-
-        return [feature_map[f] for f in features]
-
+        # return encoded sequences
+        # return [Xw,Xlw,Xl,Xp] (or just the subset expected by the NN inputs) 
+        return Xw
     
     ## --------- encode Y from given data ----------- 
     def encode_labels(self, data) :
