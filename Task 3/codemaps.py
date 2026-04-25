@@ -6,7 +6,11 @@ import numpy as np
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
 
+from transformers import AutoTokenizer
+
 from dataset import *
+
+BIOBERT_MODEL = 'dmis-lab/biobert-base-cased-v1.2'
 
 class Codemaps :
     # --- constructor, create mapper either from training data, or
@@ -30,6 +34,7 @@ class Codemaps :
     def __create_indexs(self, data, maxlen) :
 
         self.maxlen = maxlen
+        self.tokenizer = AutoTokenizer.from_pretrained(BIOBERT_MODEL)
         words = set([])
         lc_words = set([])
         lems = set([])
@@ -65,6 +70,7 @@ class Codemaps :
     ## --------- load indexs ----------- 
     def __load(self, name) : 
         self.maxlen = 0
+        self.tokenizer = AutoTokenizer.from_pretrained(BIOBERT_MODEL)
         self.word_index = {}
         self.lc_word_index = {}
         self.lemma_index = {}
@@ -107,22 +113,23 @@ class Codemaps :
     ## --------- encode X from given data ----------- 
    
     
-    def encode_words(self, data, features=("word",)):
-        feature_map = {
-            # encode and pad sentence words
-            "word": self.__encode_and_pad(data, self.word_index, 'form'),
-
-            # encode and pad sentence lc_words
-            "lc": self.__encode_and_pad(data, self.lc_word_index, 'lc_form'),
-
-            # encode and pad lemmas
-            "lemma": self.__encode_and_pad(data, self.lemma_index, 'lemma'),
-
-            # encode and pad PoS
-            "pos": self.__encode_and_pad(data, self.pos_index, 'pos'),
-        }
-
-        return [feature_map[f] for f in features]
+    def encode_words(self, data, features=("input_ids", "attention_mask")):
+        input_ids = []
+        attention_masks = []
+        for s in data.sentences():
+            text = ' '.join([t['form'] for t in s['sent']])
+            encoded = self.tokenizer(
+                text,
+                max_length=self.maxlen,
+                padding='max_length',
+                truncation=True,
+                return_attention_mask=True,
+                return_token_type_ids=False,
+                return_tensors='np'
+            )
+            input_ids.append(encoded['input_ids'][0])
+            attention_masks.append(encoded['attention_mask'][0])
+        return [np.array(input_ids), np.array(attention_masks)]
 
     
     ## --------- encode Y from given data ----------- 
