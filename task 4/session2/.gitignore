@@ -1,0 +1,18 @@
+# DDI corpus and bundled reference material
+DDI/
+
+# Generated feature/model/output files
+*.feat
+*.clf.feat
+*.out
+*.stats
+*.crf
+*.joblib
+
+# Python cache and local environments
+__pycache__/
+*.py[cod]
+.venv/
+
+# OS metadata
+.DS_Store

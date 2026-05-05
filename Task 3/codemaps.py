@@ -10,8 +10,6 @@ from transformers import AutoTokenizer
 
 from dataset import *
 
-BIOBERT_MODEL = 'dmis-lab/biobert-base-cased-v1.2'
-
 class Codemaps :
     # --- constructor, create mapper either from training data, or
     # --- loading codemaps from given file
@@ -34,7 +32,7 @@ class Codemaps :
     def __create_indexs(self, data, maxlen) :
 
         self.maxlen = maxlen
-        self.tokenizer = AutoTokenizer.from_pretrained(BIOBERT_MODEL)
+        self.tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
         words = set([])
         lc_words = set([])
         lems = set([])
@@ -70,7 +68,7 @@ class Codemaps :
     ## --------- load indexs ----------- 
     def __load(self, name) : 
         self.maxlen = 0
-        self.tokenizer = AutoTokenizer.from_pretrained(BIOBERT_MODEL)
+        self.tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
         self.word_index = {}
         self.lc_word_index = {}
         self.lemma_index = {}
