@@ -34,6 +34,7 @@ if __name__ == '__main__':
 
     # get file where model will be written
     modelfile = sys.argv[1]
+    c2 = float(sys.argv[2]) if len(sys.argv) > 2 else 0.05
     
     # Create a Trainer object.
     trainer = pycrfsuite.Trainer()
@@ -47,7 +48,7 @@ if __name__ == '__main__':
     
     # This demonstrates how to list parameters and obtain their values.    
     trainer.set('feature.minfreq', 1) # mininum frequecy of a feature to consider it
-    trainer.set('c2', 0.1)           # coefficient for L2 regularization
+    trainer.set('c2', c2)           # coefficient for L2 regularization
 
     print("Training with following parameters: ")
     for name in trainer.params():
@@ -55,4 +56,3 @@ if __name__ == '__main__':
         
     # Start training and dump model to modelfile
     trainer.train(modelfile, -1)
-

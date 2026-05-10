@@ -8,6 +8,34 @@ from xml.dom.minidom import parse
 from nltk.tokenize import word_tokenize
 
 
+def load_drug_dictionaries():
+   drugbank = set()
+   drugbank_types = {}
+   hsdb = set()
+
+   with open("DDI/resources/DrugBank.txt", encoding="utf-8") as f:
+      for line in f:
+         line = line.strip()
+         if not line:
+            continue
+         fields = line.split("|")
+         name = fields[0].lower()
+         typ = fields[1] if len(fields) > 1 else "unknown"
+         drugbank.add(name)
+         drugbank_types[name] = typ
+
+   with open("DDI/resources/HSDB.txt", encoding="utf-8") as f:
+      for line in f:
+         name = line.strip().lower()
+         if name:
+            hsdb.add(name)
+
+   return drugbank, drugbank_types, hsdb
+
+
+DRUGBANK, DRUGBANK_TYPES, HSDB = load_drug_dictionaries()
+
+
    
 ## --------- tokenize sentence ----------- 
 ## -- Tokenize sentence, returning tokens and span offsets
@@ -50,7 +78,18 @@ def extract_features(tokens) :
       t = tokens[k][0]
 
       tokenFeatures.append("form="+t)
+      tokenFeatures.append("lower="+t.lower())
+      tokenFeatures.append("pref3="+t[:3])
+      tokenFeatures.append("pref4="+t[:4])
+      tokenFeatures.append("pref5="+t[:5])
       tokenFeatures.append("suf3="+t[-3:])
+      tokenFeatures.append("isCapitalized="+str(t[:1].isupper()))
+      tokenFeatures.append("isUpperCase="+str(t.isupper()))
+      tokenFeatures.append("containsDigit="+str(any(c.isdigit() for c in t)))
+      tokenFeatures.append("containsHyphen="+str("-" in t))
+      tokenFeatures.append("inDrugBank="+str(t.lower() in DRUGBANK))
+      tokenFeatures.append("inHSDB="+str(t.lower() in HSDB))
+      tokenFeatures.append("drugBankType="+DRUGBANK_TYPES.get(t.lower(), "none"))
 
       if k>0 :
          tPrev = tokens[k-1][0]
@@ -59,12 +98,28 @@ def extract_features(tokens) :
       else :
          tokenFeatures.append("BoS")
 
+      if k>1 :
+         tPrev2 = tokens[k-2][0]
+         tokenFeatures.append("formPrev2="+tPrev2)
+         tokenFeatures.append("suf3Prev2="+tPrev2[-3:])
+      else :
+         tokenFeatures.append("formPrev2=BoS2")
+         tokenFeatures.append("suf3Prev2=BoS2")
+
       if k<len(tokens)-1 :
          tNext = tokens[k+1][0]
          tokenFeatures.append("formNext="+tNext)
          tokenFeatures.append("suf3Next="+tNext[-3:])
       else:
          tokenFeatures.append("EoS")
+
+      if k<len(tokens)-2 :
+         tNext2 = tokens[k+2][0]
+         tokenFeatures.append("formNext2="+tNext2)
+         tokenFeatures.append("suf3Next2="+tNext2[-3:])
+      else:
+         tokenFeatures.append("formNext2=EoS2")
+         tokenFeatures.append("suf3Next2=EoS2")
     
       result.append(tokenFeatures)
     
